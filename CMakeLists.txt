@@ -38,9 +38,6 @@ endif()
 
 add_subdirectory(lib)
 
-set(CMAKE_CXX_STANDARD 17)                            # enable c++17
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 find_package(Threads REQUIRED)                        # thread library (pthread)
 add_subdirectory(core)
 
@@ -57,8 +54,4 @@ if (${YOSYS_PLUGIN})
   endif()
 endif()
 
-enable_testing()
-add_executable(unit_tests tests/basic.cpp)
-target_link_libraries(unit_tests gtest_main)
-include(GoogleTest)
-gtest_discover_tests(unit_tests)
+add_subdirectory(tests)

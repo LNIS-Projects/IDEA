@@ -8,7 +8,7 @@ TEE := cat - >
 ISCAS85 := iscas85/c432.v iscas85/c880a.v iscas85/c3540a.v iscas85/c5288.v iscas85/c2670a.v iscas85/c5315a.v iscas85/c3540.v iscas85/c1908a.v iscas85/c7552.v iscas85/c499.v iscas85/c2670.v iscas85/c1908.v iscas85/c5315.v iscas85/c1335.v
 ISCAS89 := iscas89/s1196.v iscas89/s1238.v iscas89/s15850.v
 OPDB := opdb/chip_bridge.pickle.v opdb/fpu.pickle.v opdb/gng.pickle.v # opdb/sparc_core.pickle.v
-ORIGINAL_FILES := picorv32/picorv32.v ibex/ibex.v ${OPDB} ${ISCAS85} ${ISCAS89}
+ORIGINAL_FILES := picorv32/picorv32.v ibex/ibex.v ${OPDB} # ${ISCAS85} ${ISCAS89}
 
 ################################################################
 ######################## Targets ###############################
@@ -23,6 +23,13 @@ SYNTH_BASE := $(patsubst %.v,%.rtl,${ORIGINAL_FILES})
 SYNTH_BASE_LOGS := $(patsubst %.rtl,%.synth.log,${SYNTH_BASE})
 
 LSORACLE_OUTPUTS := $(patsubst %.rtl,%_lsoracle.rtl,${SYNTH_BASE})
+LSORACLE_SYNTH_LOG := $(patsubst %.rtl,%_lsoracle.synth.log,${SYNTH_BASE})
+LSORACLE_TECHMAP_OUTPUTS := $(patsubst %.rtl,%_lsoracle.mapped.v,${SYNTH_BASE})
+LSORACLE_SYNTH_REPORTS := $(patsubst %.rtl,%_lsoracle.synth_report,${SYNTH_BASE})
+LSORACLE_TECHMAP_LOGS := $(patsubst %.rtl,%_lsoracle.tech.log,${SYNTH_BASE})
+LSORACLE_TIMING_REPORT := $(patsubst %.rtl,%_lsoracle.timing,${SYNTH_BASE})
+LSORACLE_TIMING_LOG := $(patsubst %.rtl,%_lsoracle.sta.log,${SYNTH_BASE})
+
 ABC_OUTPUTS := $(patsubst %.rtl,%_abc.rtl,${SYNTH_BASE})
 UNOPT_OUTPUTS := $(patsubst %.rtl,%_unoptimized.rtl,${SYNTH_BASE})
 SYNTH_OUTPUTS := ${LSORACLE_OUTPUTS} ${UNOPT_OUTPUTS} ${ABC_OUTPUTS}
@@ -40,7 +47,7 @@ REPORTS := $(patsubst %.v,%.report,${ORIGINAL_FILES})
 ################################################################
 all: everything.png
 
-.PHONY: extract synth reports techmap reports timing everything_reports clean all
+.PHONY: extract synth reports techmap reports timing everything_reports clean all reset
 
 .PRECIOUS: ${SDC_SCRIPTS} ${AIG_FILES} ${AIG_LOGS} ${SYNTH_BASE} ${SYNTH_BASE_LOGS} ${SYNTH_OUTPUTS} ${SYNTH_LOGS} ${REPORTS} ${TECHMAP_OUTPUTS} ${TECHMAP_LOGS} ${TIMING} ${SYNTH_REPORTS} ${TIMING_REPORTS} ${EVERYTHING_REPORTS} ${REPORTS}
 
@@ -58,6 +65,9 @@ timing: ${TIMING}
 
 sdc_skel: $(patsubst %.v,%.sdc,$(wildcard iscas89/*.v))
 
+reset:
+	rm -f ${LSORACLE_OUTPUTS} ${LSORACLE_SYNTH_LOG} ${LSORACLE_TECHMAP_OUTPUTS} ${LSORACLE_SYNTH_REPORTS} ${LSORACLE_TECHMAP_LOGS} ${LSORACLE_TIMING_REPORT} ${LSORACLE_TIMING_LOG} ${REPORTS}
+
 clean: clean_reports
 	rm -f ${AIG_FILES} ${AIG_LOGS} ${SYNTH_BASE} ${SYNTH_BASE_LOGS} ${SYNTH_OUTPUTS} ${SYNTH_LOGS} ${TECHMAP_OUTPUTS} ${TIMING} ${SDC_SCRIPTS} ${TECHMAP_LOGS}
 
@@ -74,11 +84,26 @@ clean_reports:
 %.aig %.aig.log &: %.rtl
 	${YOSYS} -Q -p "read_rtlil $<; dffunmap; aigmap; write_aiger $*.aig" | ${TEE} $*.aig.log
 
-%_lsoracle.rtl %_lsoracle.synth.log &: %.rtl
-	${YOSYS} -m ${YOSYS_PLUGIN} -Q -p "read_rtlil $<; lsoracle -lso_exe ${LSORACLE} -c kahypar.ini; techmap; opt -purge; stat; write_rtlil $*_lsoracle.rtl" | ${TEE} $*_lsoracle.synth.log
+%_lsoracle.rtl %_lsoracle.synth.log %_lsoracle.parts %_lsoracle.fixed: %.rtl
+	$(eval TEMP=$(shell mktemp))
+	echo "ps -a; partitioning --sap --size 2048 --epsilon 6 -c $$(pwd)/ff_.ini -i $*_lsoracle.fixed -o $*_lsoracle.parts; optimization --strategy 3 --fixed_initial; ps -m; crit_path_stats; ntk_stats " > ${TEMP}
+	${YOSYS} -m ${YOSYS_PLUGIN} -Q -p "read_rtlil $<; lsoracle -lso_exe ${LSORACLE} -script ${TEMP}; techmap; opt -purge; stat; write_rtlil $*_lsoracle.rtl" | ${TEE} $*_lsoracle.synth.log
+	rm ${TEMP}
+
+# %_lsoracle.rtl %_lsoracle.synth.log %_lsoracle.parts %_lsoracle.fixed: %.rtl
+# 	$(eval TEMP=$(shell mktemp))
+# 	echo "ps -a; partitioning -c ../../lso-benchmarks/ff_km1_kKaHyPar_sea20.ini -i $*_lsoracle.fixed -o $*_lsoracle.parts; optimization ; ps -m; crit_path_stats; ntk_stats " > ${TEMP}
+# 	${YOSYS} -m ${YOSYS_PLUGIN} -Q -p "read_rtlil $<; lsoracle -lso_exe ${LSORACLE} -script ${TEMP}; techmap; opt -purge; stat; write_rtlil $*_lsoracle.rtl" | ${TEE} $*_lsoracle.synth.log
+# 	rm ${TEMP}
 
 %_unoptimized.rtl: %.rtl
 	cp $< $@
+
+%.hpg: %.rtl
+	$(eval TEMP=$(shell mktemp))
+	echo "write_hypergraph $@" > ${TEMP}
+	${YOSYS} -m ${YOSYS_PLUGIN} -Q -p "read_rtlil $<; lsoracle -lso_exe ${LSORACLE} -script ${TEMP}"
+	rm ${TEMP}
 
 %_abc.rtl %_abc.synth.log &: %.rtl
 	${YOSYS} -Q -p "read_rtlil $<; abc -script techmapping/resyn2rs.abc; techmap; stat; write_rtlil $*_abc.rtl" | ${TEE} $*_abc.synth.log
@@ -142,7 +167,7 @@ previous/%_lsoracle.everything: | previous
 
 %_lsoracle.synth_report: %_lsoracle.synth.log
 	@ echo generating report $@
-	@ sed -n 's/LSOracle: nodes: \([0-9]*\)/nodes\t\1/p; s/LSOracle: inputs: \([0-9]*\)/inputs\t\1/p;  s/LSOracle: outputs: \([0-9]*\)/outputs\t\1/p;  s/LSOracle: AIG level: \([0-9]*\)/aig_level\t\1/p; s/LSOracle: AIG nodes: \([0-9]*\)/aig_nodes\t\1/p; s/LSOracle.* partitioned \([0-9]*\) times/partitions\t\1/p; s/LSOracle: Final ntk size = \([0-9]*\) and depth = \([0-9]*\)/opt_nodes\t\1\
+	@ sed -n 's/LSOracle: nodes: \([0-9]*\)/nodes\t\1/p; s/LSOracle: inputs: \([0-9]*\)/inputs\t\1/p;  s/LSOracle: outputs: \([0-9]*\)/outputs\t\1/p;  s/LSOracle: AIG level: \([0-9]*\)/aig_level\t\1/p; s/LSOracle: AIG nodes: \([0-9]*\)/aig_nodes\t\1/p; s/LSOracle.* Using \([0-9]*\) partitions/partitions\t\1/p; s/LSOracle: Final ntk size = \([0-9]*\) and depth = \([0-9]*\)/opt_nodes\t\1\
 opt_level\t\2/p; s/LSOracle: \([0-9]*\) AIGs and \([0-9]*\) MIGs/aigs\t\1\
 migs\t\2/p; s/LSOracle: Full Optimization: \([0-9]*\)ms/runtime\t\1/p; s/LSOracle: MAJ nodes: \([0-9]*\)/mig_nodes\t\1/p;  s/LSOracle: MIG level: \([0-9]*\)/mig_level\t\1/p;  s/LSOracle: MAJ nodes internally = \([0-9]*\)/maj_nodes_internal\t\1/p;  s/LSOracle: AND nodes internally = \([0-9]*\)/and_nodes_internal\t\1/p' < $< > $@
 
@@ -173,8 +198,5 @@ everything.tsv: ${EVERYTHING_REPORTS}
 	@ echo "unopt_arrival\tunopt_worst_slack\tunopt_area\t" >> $@
 	cat $^ >> $@
 
-everything.png: everything.tsv
-	python3 plot_bars.py $^ previous/everything.tsv $@
-
-everything.pdf: everything.tsv
-	python3 plot_bars.py $^ previous/everything.tsv $@
+everything.png everything.pdf: everything.tsv
+	python3 plot_bars.py everything.tsv "Latest LSOracle"  previous/everything.tsv "Previous LSOracle" $@

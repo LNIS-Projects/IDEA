@@ -28,6 +28,7 @@ namespace alice
                 opts.add_option( "--out,-o", out_file, "Verilog output" );
                 opts.add_option( "--strategy,-s", strategy, "classification strategy [area delay product=0, area=1, delay=2, delay_threshold=3]" );
                 opts.add_option( "--threshold", threshold, "maximum delay threshold for strategy 3" );
+                opts.add_flag( "--fixed_initial", "Depth optimize initial partitions.");
                 opts.add_option( "--aig_partitions", aig_parts, "space separated list of partitions to always be AIG optimized" );
                 opts.add_option( "--mig_partitions", mig_parts, "space separated list of partitions to always be MIG optimized" );
                 opts.add_option( "--depth_partitions", depth_parts, "space separated list of partitions to always be depth optimized" );
@@ -58,6 +59,15 @@ namespace alice
             if(is_set("combine"))
               combine = true;
 
+            if (is_set("fixed_initial")) {
+              std::set<kahypar_partition_id_t> fixed_partitions = partitions_aig.fixed_partitions();
+              std::copy(fixed_partitions.begin(), fixed_partitions.end(), std::inserter(depth_parts, depth_parts.end()));
+             }
+
+            if (threshold == 0 && strategy == 3) {
+              threshold = calculate_depth_percentile();
+            }
+
             std::copy(aig_parts.begin(), aig_parts.end(), std::inserter(aig_always_partitions, aig_always_partitions.end()));
             std::copy(mig_parts.begin(), mig_parts.end(), std::inserter(mig_always_partitions, mig_always_partitions.end()));
             std::copy(area_parts.begin(), area_parts.end(), std::inserter(area_always_partitions, area_always_partitions.end()));
@@ -65,6 +75,7 @@ namespace alice
             std::copy(skip_parts.begin(), skip_parts.end(), std::inserter(skip_partitions, skip_partitions.end()));
 
             auto start = std::chrono::high_resolution_clock::now();
+
             auto ntk_mig = oracle::optimization(ntk_aig, partitions_aig, strategy, threshold, nn_model,
                                                 high, aig, mig, combine,
                                                 aig_always_partitions, mig_always_partitions,
@@ -88,7 +99,7 @@ namespace alice
                   mockturtle::write_verilog_params ps;
                   if(is_set("skip-feedthrough"))
                     ps.skip_feedthrough = 1u;
-                  
+
                   mockturtle::write_verilog(ntk_mig, out_file, ps);
                   std::cout << "Resulting network written to " << out_file << "\n";
                 }
@@ -96,7 +107,7 @@ namespace alice
                   mockturtle::write_blif_params ps;
                   if(is_set("skip-feedthrough"))
                     ps.skip_feedthrough = 1u;
-                  
+
                   mockturtle::write_blif(ntk_mig, out_file, ps);
                   std::cout << "Resulting network written to " << out_file << "\n";
                 }
@@ -108,7 +119,7 @@ namespace alice
             else{
               std::cout << "No change made to network\n";
             }
-            
+
           }
           else{
             std::cout << "AIG not partitioned yet\n";
@@ -119,6 +130,9 @@ namespace alice
         }
       }
     private:
+        int calculate_depth_percentile() {
+          return 42;
+        }
         std::string nn_model{};
         std::string out_file{};
         std::vector<int32_t> aig_parts{};

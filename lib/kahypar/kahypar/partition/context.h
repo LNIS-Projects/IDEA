@@ -529,6 +529,7 @@ static inline void checkRecursiveBisectionMode(RefinementAlgorithm& algo) {
         << algo
         << ". However, the 2-way counterpart "
         << "is better and faster.";
+    /*
     LOG << "Should the local search algorithm be changed (Y/N)?";
     char answer = 'N';
     std::cin >> answer;
@@ -544,6 +545,7 @@ static inline void checkRecursiveBisectionMode(RefinementAlgorithm& algo) {
       LOG << "Changing local search algorithm to"
           << algo;
     }
+*/
   }
 }
 
@@ -554,6 +556,7 @@ static inline void checkDirectKwayMode(RefinementAlgorithm& algo, Objective& obj
     LOG << "WARNING: local search algorithm is set to"
         << algo
         << ". This algorithm cannot be used for direct k-way partitioning with k>2.";
+    /*
     LOG << "Should the local search algorithm be changed to corresponding k-way counterpart (Y/N)?";
     char answer = 'N';
     std::cin >> answer;
@@ -573,6 +576,7 @@ static inline void checkDirectKwayMode(RefinementAlgorithm& algo, Objective& obj
       LOG << "Changing local search algorithm to"
           << algo;
     }
+    */
   }
 }
 
@@ -640,6 +644,7 @@ static inline void sanityCheck(const Hypergraph& hypergraph, Context& context) {
       !context.partition.max_part_weights.empty()) {
     LOG << "Individual block weights specified, but --use-individual-part-weights=false.";
     LOG << "Do you want to use the block weights you specified (Y/N)?";
+    /*
     char answer = 'N';
     std::cin >> answer;
     answer = std::toupper(answer);
@@ -655,6 +660,7 @@ static inline void sanityCheck(const Hypergraph& hypergraph, Context& context) {
         std::exit(0);
       }
     }
+    */
   }
 
   if (context.local_search.hyperflowcutter.snapshot_scaling > 1.0 &&

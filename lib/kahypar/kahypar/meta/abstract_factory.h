@@ -63,7 +63,7 @@ class Factory {
       return AbstractProductPtr((creator->second)(std::forward<ProductParameters>(params) ...));
     }
     LOG << "Invalid object identifier";
-    std::exit(-1);
+    throw new std::exception;
   }
 
   static Factory & getInstance() {

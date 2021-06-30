@@ -9,7 +9,7 @@ import numpy.lib.recfunctions as rcf
 plt.rcParams['font.size'] = '9'
 plt.style.use('tableau-colorblind10')
 plt.rcParams['font.family'] = 'serif'
-input_file, prev_file, output_file = sys.argv[1:] if len(sys.argv) > 1 else ('everything.tsv', 'previous/everything.tsv', 'everything.png')
+input_file, input_label, prev_file, prev_label, output_file = sys.argv[1:] if len(sys.argv) > 1 else ('everything.tsv', "Latest LSOracle", 'previous/everything.tsv', "Previous LSOracle", 'everything.png')
 
 n = np.genfromtxt(input_file, delimiter='\t', names=True, dtype=None, encoding="UTF-8")
 
@@ -71,8 +71,8 @@ for m, t, ax, da in [
 
     labels = np.append(d["circuit"], "average")
 
-    farm = ax.barh(x+width, u, width, label="Latest LSOracle")
-    lsoracle = ax.barh(x, l, width, label="Previous LSOracle")
+    farm = ax.barh(x+width, u, width, label=input_label)
+    lsoracle = ax.barh(x, l, width, label=prev_label)
     abc = ax.barh(x-width, a, width, label="ABC")
 
     ax.set_xlabel("% improvement over original circuit")

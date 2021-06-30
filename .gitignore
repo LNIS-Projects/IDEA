@@ -12,3 +12,4 @@ examples/abc/scala/target
 
 tests/**/*.v
 hypergraph.txt
+*.dot
